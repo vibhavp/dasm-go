@@ -68,6 +68,95 @@ func (v *vm) fetch() int32 {
 	return v.bytecode[v.pc]
 }
 
+func (v *vm) next()  { v.pc += 1 }
+func (v *vm) next2() { v.pc += 2 }
+
+var opTable = map[int32]func(v *vm){
+	opcode.I32_LOAD: func(vm *vm) {
+		if vm.safe && vm.pc+1 == len(vm.bytecode) {
+			panic(VMRuntimeError{vm.pc, invalidInstruction})
+		}
+		vm.push(vm.fetch())
+		vm.next()
+	},
+	opcode.I32_ADD: func(vm *vm) {
+		v1 := vm.pop()
+		v2 := vm.pop()
+		vm.push(v1 + v2)
+		vm.next()
+	},
+	opcode.I32_MULT: func(vm *vm) {
+		v1 := vm.pop()
+		v2 := vm.pop()
+		vm.push(v1 * v2)
+		vm.next()
+	},
+	opcode.I32_SUB: func(vm *vm) {
+		v1 := vm.pop()
+		v2 := vm.pop()
+		vm.push(v1 - v2)
+		vm.next()
+	},
+	opcode.I32_PRINT: func(vm *vm) {
+		fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
+		vm.next()
+	},
+	opcode.I32_SETJMP: func(vm *vm) {
+		saved := &context{
+			stack: make([]int32, vm.top+1),
+			pc:    vm.pc,
+			top:   vm.top,
+		}
+		copy(saved.stack, vm.stack)
+		vm.savedContexts[vm.fetch()] = saved
+		vm.push(0)
+		vm.next()
+	},
+	opcode.I32_LONGJMP: func(vm *vm) {
+		ctxt := vm.savedContexts[vm.fetch()]
+		if ctxt == nil {
+			panic(VMRuntimeError{vm.pc, invalidContext})
+		}
+		vm.top = ctxt.top
+		copy(vm.stack, ctxt.stack)
+		vm.pc = ctxt.pc
+		vm.push(1)
+		vm.next2()
+	},
+	opcode.I32_JMP1: func(vm *vm) {
+		v1 := vm.pop()
+		addr := vm.fetch()
+		if v1 == 1 {
+			if int(addr) >= len(vm.bytecode) {
+				panic(VMRuntimeError{vm.pc, invalidAddr})
+			}
+			vm.pc = int(addr)
+		} else {
+			vm.next()
+		}
+	},
+	opcode.I32_JMPNOT1: func(vm *vm) {
+		v1 := vm.pop()
+		addr := vm.fetch()
+		if v1 != 1 {
+			if int(addr) >= len(vm.bytecode) {
+				panic(VMRuntimeError{vm.pc, invalidAddr})
+			}
+			vm.pc = int(addr)
+		} else {
+			vm.next()
+		}
+	},
+	opcode.JMP: func(vm *vm) {
+		addr := vm.fetch()
+		if int(addr) >= len(vm.bytecode) {
+			panic(VMRuntimeError{vm.pc, invalidAddr})
+		}
+		vm.pc = int(addr)
+	},
+	opcode.NOOP: func(vm *vm) { vm.next() },
+}
+
 func Run(bytecode []int32, maxStackDepth int, safe bool) {
 	var insn int32
 
@@ -86,76 +175,7 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 
 	for vm.pc < len(bytecode) {
 		insn = bytecode[vm.pc]
-		switch insn {
-		case opcode.I32_LOAD: // i32_load
-			if safe && vm.pc+1 == len(bytecode) {
-				panic(VMRuntimeError{vm.pc, invalidInstruction})
-			}
-			vm.push(vm.fetch())
-		case opcode.I32_ADD: //i32_add
-			v1 := vm.pop()
-			v2 := vm.pop()
-			vm.push(v1 + v2)
-		case opcode.I32_MULT: //i32_mult
-			v1 := vm.pop()
-			v2 := vm.pop()
-			vm.push(v1 * v2)
-		case opcode.I32_SUB: //i32_sub
-			v1 := vm.pop()
-			v2 := vm.pop()
-			vm.push(v1 - v2)
-		case opcode.I32_PRINT: //i32_print
-			fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
-		case opcode.I32_SETJMP:
-			saved := &context{
-				stack: make([]int32, vm.top+1),
-				pc:    vm.pc + 1,
-				top:   vm.top,
-			}
-			copy(saved.stack, vm.stack)
-			vm.savedContexts[vm.fetch()] = saved
-			vm.push(0)
-		case opcode.I32_LONGJMP:
-			ctxt := vm.savedContexts[vm.fetch()]
-			if ctxt == nil {
-				panic(VMRuntimeError{vm.pc, invalidContext})
-			}
-			vm.top = ctxt.top
-			copy(vm.stack, ctxt.stack)
-			vm.pc = ctxt.pc
-			vm.push(1)
-		case opcode.I32_JMP1:
-			v1 := vm.pop()
-			addr := vm.fetch()
-			if v1 == 1 {
-				if int(addr) >= len(vm.bytecode) {
-					panic(VMRuntimeError{vm.pc, invalidAddr})
-				}
-				vm.pc = int(addr)
-				continue
-			}
-		case opcode.I32_JMPNOT1:
-			v1 := vm.pop()
-			addr := vm.fetch()
-			if v1 != 1 {
-				if int(addr) >= len(vm.bytecode) {
-					panic(VMRuntimeError{vm.pc, invalidAddr})
-				}
-				vm.pc = int(addr)
-				continue
-			}
-		case opcode.JMP:
-			addr := vm.fetch()
-			if int(addr) >= len(vm.bytecode) {
-				panic(VMRuntimeError{vm.pc, invalidAddr})
-			}
-			vm.pc = int(addr)
-			continue
-		case opcode.NOOP:
-
-		default:
-			panic(VMRuntimeError{vm.pc, invalidInstruction})
-		}
-		vm.pc += 1
+		opTable[insn](vm)
+		// fn(vm)
 	}
 }
