@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/vibhavp/dasm-go/read"
+	"github.com/vibhavp/dasm-go/read/opcode"
 )
 
 type VMRuntimeError struct {
@@ -87,44 +87,44 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 	for vm.pc < len(bytecode) {
 		insn = bytecode[vm.pc]
 		switch insn {
-		case read.I32_LOAD: // i32_load
+		case opcode.I32_LOAD: // i32_load
 			if safe && vm.pc+1 == len(bytecode) {
 				panic(VMRuntimeError{vm.pc, invalidInstruction})
 			}
 			vm.push(vm.fetch())
-		case read.I32_ADD: //i32_add
+		case opcode.I32_ADD: //i32_add
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 + v2)
-		case read.I32_MULT: //i32_mult
+		case opcode.I32_MULT: //i32_mult
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 * v2)
-		case read.I32_SUB: //i32_sub
+		case opcode.I32_SUB: //i32_sub
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 - v2)
-		case read.I32_PRINT: //i32_print
+		case opcode.I32_PRINT: //i32_print
 			fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
-		case read.I32_SETJMP:
+		case opcode.I32_SETJMP:
 			saved := &context{
-				stack: make([]int32, len(vm.stack)),
+				stack: make([]int32, vm.top+1),
 				pc:    vm.pc + 1,
 				top:   vm.top,
 			}
 			copy(saved.stack, vm.stack)
 			vm.savedContexts[vm.fetch()] = saved
 			vm.push(0)
-		case read.I32_LONGJMP:
+		case opcode.I32_LONGJMP:
 			ctxt := vm.savedContexts[vm.fetch()]
 			if ctxt == nil {
 				panic(VMRuntimeError{vm.pc, invalidContext})
 			}
 			vm.top = ctxt.top
-			vm.stack = ctxt.stack
+			copy(vm.stack, ctxt.stack)
 			vm.pc = ctxt.pc
 			vm.push(1)
-		case read.I32_JMP1:
+		case opcode.I32_JMP1:
 			v1 := vm.pop()
 			addr := vm.fetch()
 			if v1 == 1 {
@@ -134,7 +134,7 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 				vm.pc = int(addr)
 				continue
 			}
-		case read.I32_JMPNOT1:
+		case opcode.I32_JMPNOT1:
 			v1 := vm.pop()
 			addr := vm.fetch()
 			if v1 != 1 {
@@ -144,13 +144,15 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 				vm.pc = int(addr)
 				continue
 			}
-		case read.JMP:
+		case opcode.JMP:
 			addr := vm.fetch()
 			if int(addr) >= len(vm.bytecode) {
 				panic(VMRuntimeError{vm.pc, invalidAddr})
 			}
 			vm.pc = int(addr)
 			continue
+		case opcode.NOOP:
+
 		default:
 			panic(VMRuntimeError{vm.pc, invalidInstruction})
 		}
