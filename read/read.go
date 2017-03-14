@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 )
@@ -11,6 +12,26 @@ import (
 type Bytecode struct {
 	Bytecode      []int32
 	MaxStackDepth int
+}
+
+const (
+	I32_LOAD    = 0x28
+	I32_ADD     = 0x6a
+	I32_MULT    = 0x6b
+	I32_SUB     = 0x6c
+	I32_PRINT   = 0xcc
+	I32_SETJMP  = 0x11
+	I32_LONGJMP = 0x10
+)
+
+// How many operands (if any) does an op have?
+var NumOperands = map[int32]int{
+	I32_LOAD: 1,
+} //everything else becomes 0
+
+// How much does an op increase the stack depth by?
+var stackAdj = map[int32]int{
+	I32_LOAD: 1,
 }
 
 func FromReader(reader io.Reader) (*Bytecode, error) {
@@ -33,18 +54,23 @@ func FromReader(reader io.Reader) (*Bytecode, error) {
 		}
 		// FIXME: this takes 4 bytes bytes for each op, which wastes space
 		b.Bytecode = append(b.Bytecode, int32(op))
-		switch op {
-		case 0x28:
-			var i int32
-			err := binary.Read(reader, binary.LittleEndian, &i)
-			if err == io.EOF {
-				return nil, errors.New("read: incomplete instruction i32_load")
-			} else if err != nil {
-				return nil, err
+
+		if ar := NumOperands[int32(op)]; ar != 0 {
+			i := 0
+			for i < ar {
+				var op int32
+				err := binary.Read(reader, binary.LittleEndian, &op)
+				if err == io.EOF {
+					return nil, fmt.Errorf("read: Incomplete instruction %d", op)
+				} else if err != nil {
+					return nil, err
+				}
+				b.Bytecode = append(b.Bytecode, op)
+				i += 1
 			}
-			b.Bytecode = append(b.Bytecode, i)
-			b.MaxStackDepth += 1
 		}
+
+		b.MaxStackDepth += stackAdj[int32(op)]
 	}
 }
 

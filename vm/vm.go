@@ -3,6 +3,8 @@ package vm
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/vibhavp/dasm-go/read"
 )
 
 type VMRuntimeError struct {
@@ -66,26 +68,25 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 	for vm.pc < len(bytecode) {
 		insn = bytecode[vm.pc]
 		switch insn {
-		case 0x28: // i32_load
+		case read.I32_LOAD: // i32_load
 			if safe && vm.pc+1 == len(bytecode) {
 				panic(VMRuntimeError{vm.pc, invalidInstruction})
 			}
 			vm.push(vm.bytecode[vm.pc+1])
 			vm.pc += 1
-
-		case 0x6a: //i32_add
+		case read.I32_ADD: //i32_add
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 + v2)
-		case 0x6b: //i32_mult
+		case read.I32_MULT: //i32_mult
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 * v2)
-		case 0x6c: //i32_sub
+		case read.I32_SUB: //i32_sub
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 - v2)
-		case 0xcc: //i32_print
+		case read.I32_PRINT: //i32_print
 			fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
 		default:
 			panic(VMRuntimeError{vm.pc, invalidInstruction})

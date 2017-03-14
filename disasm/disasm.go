@@ -24,15 +24,28 @@ func ToDasm(b *read.Bytecode) (string, error) {
 	for pc < len(b.Bytecode) {
 		insn = b.Bytecode[pc]
 		opstr, ok := opMap[insn]
-		if insn == 0x28 {
-			pc += 1
-			out += fmt.Sprintf("%s %d\n", opstr, b.Bytecode[pc])
+
+		if !ok {
+			return "", fmt.Errorf("Invalid Instruction: %d", insn)
 		} else {
-			if !ok {
-				return "", fmt.Errorf("Invalid Instruction: %d", insn)
-			}
-			out += fmt.Sprintf("%s\n", opstr)
+			out += fmt.Sprintf("%s", opstr)
 		}
+
+		if ar := read.NumOperands[insn]; ar != 0 {
+			if pc+ar >= len(b.Bytecode) {
+				return "", fmt.Errorf("disasm: incomplete instruction %s", opstr)
+			}
+
+			i := 0
+			operands := ""
+			for i < ar {
+				pc += 1
+				i += 1
+				operands += fmt.Sprintf(" %d", b.Bytecode[pc])
+			}
+			out += operands
+		}
+		out += "\n"
 		pc += 1
 	}
 
