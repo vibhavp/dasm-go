@@ -23,7 +23,7 @@ func TestRun(t *testing.T) {
 	}
 	b1 := read.Bytecode{
 		Bytecode:      c,
-		MaxStackDepth: 12,
+		MaxStackDepth: 5,
 	}
 	Run(b1.Bytecode, b1.MaxStackDepth, false)
 }
