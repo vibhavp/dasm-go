@@ -15,19 +15,27 @@ type VMRuntimeError struct {
 const invalidInstruction = "Invalid Instruction"
 const stackOverflow = "Stack Overflow"
 const stackUnderflow = "Stack Underflow"
+const invalidContext = "Invalid Context"
+const invalidAddr = "Invalid Address"
 
 func (v VMRuntimeError) Error() string {
 	return fmt.Sprintf("Error executing bytecode at pc=%d: %s", v.pc, v.err)
 }
 
+type context struct {
+	stack []int32
+	pc    int
+	top   int
+}
+
 type vm struct {
-	stack         []int32
+	context
 	maxStackDepth int
 
 	bytecode []int32
-	pc       int
-	top      int
 	safe     bool
+
+	savedContexts map[int32]*context
 }
 
 // I should manually inline all of this, panicking in a function makes it
@@ -52,17 +60,28 @@ func (v *vm) push(i int32) {
 	v.stack[v.top] = i
 }
 
+func (v *vm) fetch() int32 {
+	if v.safe && v.pc+1 == len(v.bytecode) {
+		panic(VMRuntimeError{v.pc, invalidInstruction})
+	}
+	v.pc += 1
+	return v.bytecode[v.pc]
+}
+
 func Run(bytecode []int32, maxStackDepth int, safe bool) {
 	var insn int32
 
 	stack := make([]int32, maxStackDepth)
-	vm := vm{
-		stack:         stack[0:len(stack)], // doesn't copy stack
+	vm := &vm{
+		context: context{
+			stack: stack[0:len(stack)], // doesn't copy stack
+			pc:    0,
+			top:   -1,
+		},
 		maxStackDepth: maxStackDepth,
 		bytecode:      bytecode,
-		pc:            0,
-		top:           -1,
 		safe:          safe,
+		savedContexts: make(map[int32]*context),
 	}
 
 	for vm.pc < len(bytecode) {
@@ -72,8 +91,7 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 			if safe && vm.pc+1 == len(bytecode) {
 				panic(VMRuntimeError{vm.pc, invalidInstruction})
 			}
-			vm.push(vm.bytecode[vm.pc+1])
-			vm.pc += 1
+			vm.push(vm.fetch())
 		case read.I32_ADD: //i32_add
 			v1 := vm.pop()
 			v2 := vm.pop()
@@ -88,6 +106,51 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 			vm.push(v1 - v2)
 		case read.I32_PRINT: //i32_print
 			fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
+		case read.I32_SETJMP:
+			saved := &context{
+				stack: make([]int32, len(vm.stack)),
+				pc:    vm.pc + 1,
+				top:   vm.top,
+			}
+			copy(saved.stack, vm.stack)
+			vm.savedContexts[vm.fetch()] = saved
+			vm.push(0)
+		case read.I32_LONGJMP:
+			ctxt := vm.savedContexts[vm.fetch()]
+			if ctxt == nil {
+				panic(VMRuntimeError{vm.pc, invalidContext})
+			}
+			vm.top = ctxt.top
+			vm.stack = ctxt.stack
+			vm.pc = ctxt.pc
+			vm.push(1)
+		case read.I32_JMP1:
+			v1 := vm.pop()
+			addr := vm.fetch()
+			if v1 == 1 {
+				if int(addr) >= len(vm.bytecode) {
+					panic(VMRuntimeError{vm.pc, invalidAddr})
+				}
+				vm.pc = int(addr)
+				continue
+			}
+		case read.I32_JMPNOT1:
+			v1 := vm.pop()
+			addr := vm.fetch()
+			if v1 != 1 {
+				if int(addr) >= len(vm.bytecode) {
+					panic(VMRuntimeError{vm.pc, invalidAddr})
+				}
+				vm.pc = int(addr)
+				continue
+			}
+		case read.JMP:
+			addr := vm.fetch()
+			if int(addr) >= len(vm.bytecode) {
+				panic(VMRuntimeError{vm.pc, invalidAddr})
+			}
+			vm.pc = int(addr)
+			continue
 		default:
 			panic(VMRuntimeError{vm.pc, invalidInstruction})
 		}

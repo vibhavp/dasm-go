@@ -22,16 +22,23 @@ const (
 	I32_PRINT   = 0xcc
 	I32_SETJMP  = 0x11
 	I32_LONGJMP = 0x10
+	I32_JMP1    = 0x12
+	I32_JMPNOT1 = 0x13
+	JMP         = 0x14
 )
 
 // How many operands (if any) does an op have?
 var NumOperands = map[int32]int{
-	I32_LOAD: 1,
+	I32_LOAD:    1,
+	I32_SETJMP:  1,
+	I32_LONGJMP: 1,
 } //everything else becomes 0
 
 // How much does an op increase the stack depth by?
 var stackAdj = map[int32]int{
-	I32_LOAD: 1,
+	I32_LOAD:    1,
+	I32_SETJMP:  1,
+	I32_LONGJMP: 1,
 }
 
 func FromReader(reader io.Reader) (*Bytecode, error) {
