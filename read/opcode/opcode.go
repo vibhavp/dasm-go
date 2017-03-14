@@ -22,8 +22,22 @@ var NumOperands = map[int32]int{
 } //everything else becomes 0
 
 // How much does an op increase the stack depth by?
-var StackAdj = map[int32]int{
+var SgtackAdj = map[int32]int{
 	I32_LOAD:    1,
 	I32_SETJMP:  1,
 	I32_LONGJMP: 1,
+}
+
+var OpStr = map[int32]string{
+	I32_LOAD:    "i32_load",
+	I32_ADD:     "i32_add",
+	I32_MULT:    "i32_mult",
+	I32_SUB:     "i32_sub",
+	I32_PRINT:   "i32_print",
+	I32_SETJMP:  "i32_setjmp",
+	I32_LONGJMP: "i32_longjmp",
+	I32_JMP1:    "i32_jmp1",
+	I32_JMPNOT1: "i32_jmpno1",
+	JMP:         "jmp",
+	NOOP:        "noop",
 }

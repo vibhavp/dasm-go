@@ -84,7 +84,7 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 		savedContexts: make(map[int32]*context),
 	}
 
-	for vm.pc < len(bytecode) {
+	for ; vm.pc < len(bytecode); vm.pc += 1 {
 		insn = bytecode[vm.pc]
 		switch insn {
 		case opcode.I32_LOAD: // i32_load
@@ -156,6 +156,5 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 		default:
 			panic(VMRuntimeError{vm.pc, invalidInstruction})
 		}
-		vm.pc += 1
 	}
 }

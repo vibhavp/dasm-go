@@ -38,8 +38,7 @@ func FromReader(reader io.Reader) (*Bytecode, error) {
 		b.Bytecode = append(b.Bytecode, int32(op))
 
 		if ar := opcode.NumOperands[int32(op)]; ar != 0 {
-			i := 0
-			for i < ar {
+			for i := 0; i < ar; i += 1 {
 				var op int32
 				err := binary.Read(reader, binary.LittleEndian, &op)
 				if err == io.EOF {
@@ -48,7 +47,6 @@ func FromReader(reader io.Reader) (*Bytecode, error) {
 					return nil, err
 				}
 				b.Bytecode = append(b.Bytecode, op)
-				i += 1
 			}
 		}
 

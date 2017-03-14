@@ -11,9 +11,8 @@ func Dump(b *read.Bytecode) (string, error) {
 		return "", nil
 	}
 	out := "\n"
-	pc := 0
 	var insn int32
-	for pc < len(b.Bytecode) {
+	for pc := 0; pc < len(b.Bytecode); pc += 1 {
 		insn = b.Bytecode[pc]
 		if insn == 0x28 {
 			pc += 1
@@ -21,7 +20,6 @@ func Dump(b *read.Bytecode) (string, error) {
 		} else {
 			out += fmt.Sprintf("0x%x\n", insn)
 		}
-		pc += 1
 	}
 
 	return out[:len(out)-1], nil
