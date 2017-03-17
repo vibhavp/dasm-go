@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/vibhavp/dasm-go/read/opcode"
+	"math"
 )
 
 type VMRuntimeError struct {
@@ -84,28 +85,41 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 		savedContexts: make(map[int32]*context),
 	}
 
-	for ; vm.pc < len(bytecode); vm.pc += 1 {
+	for vm.pc < len(bytecode) {
 		insn = bytecode[vm.pc]
 		switch insn {
 		case opcode.I32_LOAD: // i32_load
-			if safe && vm.pc+1 == len(bytecode) {
-				panic(VMRuntimeError{vm.pc, invalidInstruction})
-			}
+			vm.push(vm.fetch())
+		case opcode.F32_LOAD: // f32_load
 			vm.push(vm.fetch())
 		case opcode.I32_ADD: //i32_add
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 + v2)
+		case opcode.F32_ADD:
+			v1 := math.Float32frombits(uint32(vm.pop()))
+			v2 := math.Float32frombits(uint32(vm.pop()))
+			vm.push(int32(math.Float32bits(v1 + v2)))
 		case opcode.I32_MULT: //i32_mult
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 * v2)
+		case opcode.F32_MULT:
+			v1 := math.Float32frombits(uint32(vm.pop()))
+			v2 := math.Float32frombits(uint32(vm.pop()))
+			vm.push(int32(math.Float32bits(v1 * v2)))
 		case opcode.I32_SUB: //i32_sub
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 - v2)
+		case opcode.F32_SUB:
+			v1 := math.Float32frombits(uint32(vm.pop()))
+			v2 := math.Float32frombits(uint32(vm.pop()))
+			vm.push(int32(math.Float32bits(v1 - v2)))
 		case opcode.I32_PRINT: //i32_print
 			fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
+		case opcode.F32_PRINT:
+			fmt.Println(math.Float32frombits(uint32(vm.pop())))
 		case opcode.I32_SETJMP:
 			saved := &context{
 				stack: make([]int32, vm.top+1),
@@ -152,9 +166,40 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 			vm.pc = int(addr)
 			continue
 		case opcode.NOOP:
-
+		case opcode.I32_EQ:
+			// go wouldn't let me do vm.push(int32(vm.pop() == vm.pop()))
+			if vm.pop() == vm.pop() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.I32_GREATER:
+			if vm.pop() > vm.pop() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.I32_GEQ:
+			if vm.pop() >= vm.pop() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.I32_LESS:
+			if vm.pop() < vm.pop() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.I32_LEQ:
+			if vm.pop() <= vm.pop() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
 		default:
 			panic(VMRuntimeError{vm.pc, invalidInstruction})
 		}
+		vm.pc += 1
 	}
 }
