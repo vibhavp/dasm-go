@@ -39,14 +39,7 @@ type vm struct {
 	savedContexts map[int32]*context
 }
 
-// I should manually inline all of this, panicking in a function makes it
-// impossible for go to inline the function, resulting in unecessary overhead.
-
 func (v *vm) pop() int32 {
-	if v.safe && v.top < -1 {
-		panic(VMRuntimeError{v.pc, stackUnderflow})
-	}
-
 	v1 := v.stack[v.top]
 	v.top -= 1
 	return v1
@@ -54,19 +47,20 @@ func (v *vm) pop() int32 {
 
 func (v *vm) push(i int32) {
 	v.top += 1
-	if v.safe && v.top == v.maxStackDepth {
-		panic(VMRuntimeError{v.pc, stackOverflow})
-	}
-
 	v.stack[v.top] = i
 }
 
+func (v *vm) pushFloat(i float32) {
+	v.push(int32(math.Float32bits(i)))
+}
+
 func (v *vm) fetch() int32 {
-	if v.safe && v.pc+1 == len(v.bytecode) {
-		panic(VMRuntimeError{v.pc, invalidInstruction})
-	}
 	v.pc += 1
 	return v.bytecode[v.pc]
+}
+
+func (v *vm) popFloat() float32 {
+	return math.Float32frombits(uint32(v.pop()))
 }
 
 func Run(bytecode []int32, maxStackDepth int, safe bool) {
@@ -87,6 +81,7 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 
 	for vm.pc < len(bytecode) {
 		insn = bytecode[vm.pc]
+
 		switch insn {
 		case opcode.I32_LOAD: // i32_load
 			vm.push(vm.fetch())
@@ -97,29 +92,23 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 			v2 := vm.pop()
 			vm.push(v1 + v2)
 		case opcode.F32_ADD:
-			v1 := math.Float32frombits(uint32(vm.pop()))
-			v2 := math.Float32frombits(uint32(vm.pop()))
-			vm.push(int32(math.Float32bits(v1 + v2)))
+			vm.pushFloat(vm.popFloat() + vm.popFloat())
 		case opcode.I32_MULT: //i32_mult
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 * v2)
 		case opcode.F32_MULT:
-			v1 := math.Float32frombits(uint32(vm.pop()))
-			v2 := math.Float32frombits(uint32(vm.pop()))
-			vm.push(int32(math.Float32bits(v1 * v2)))
+			vm.pushFloat(vm.popFloat() * vm.popFloat())
 		case opcode.I32_SUB: //i32_sub
 			v1 := vm.pop()
 			v2 := vm.pop()
 			vm.push(v1 - v2)
 		case opcode.F32_SUB:
-			v1 := math.Float32frombits(uint32(vm.pop()))
-			v2 := math.Float32frombits(uint32(vm.pop()))
-			vm.push(int32(math.Float32bits(v1 - v2)))
+			vm.pushFloat(vm.popFloat() - vm.popFloat())
 		case opcode.I32_PRINT: //i32_print
 			fmt.Println(strconv.FormatInt(int64(vm.pop()), 10))
 		case opcode.F32_PRINT:
-			fmt.Println(math.Float32frombits(uint32(vm.pop())))
+			fmt.Println(vm.popFloat())
 		case opcode.I32_SETJMP:
 			saved := &context{
 				stack: make([]int32, vm.top+1),
@@ -193,6 +182,36 @@ func Run(bytecode []int32, maxStackDepth int, safe bool) {
 			}
 		case opcode.I32_LEQ:
 			if vm.pop() <= vm.pop() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.F32_EQ:
+			if vm.popFloat() == vm.popFloat() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.F32_GREATER:
+			if vm.popFloat() > vm.popFloat() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.F32_GEQ:
+			if vm.popFloat() >= vm.popFloat() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.F32_LESS:
+			if vm.popFloat() < vm.popFloat() {
+				vm.push(1)
+			} else {
+				vm.push(0)
+			}
+		case opcode.F32_LEQ:
+			if vm.popFloat() <= vm.popFloat() {
 				vm.push(1)
 			} else {
 				vm.push(0)
